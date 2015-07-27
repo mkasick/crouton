@@ -28,7 +28,7 @@
            "--type=method_call --print-reply /org/chromium/LibCrosService " \
            "org.chromium.LibCrosServiceInterface." #function)
 
-#define TRACE(...) /* fprintf(stderr, __VA_ARGS__) */
+#define TRACE(...) fprintf(stderr, __VA_ARGS__)
 #define ERROR(...) fprintf(stderr, __VA_ARGS__)
 
 static int tty0fd = -1;
