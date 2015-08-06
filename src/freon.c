@@ -10,6 +10,8 @@
 
 #define _GNU_SOURCE
 #include <dlfcn.h>
+#include <libdrm/drm.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <sys/file.h>
 #include <sys/types.h>
@@ -34,6 +36,9 @@
 static int tty0fd = -1;
 static int tty7fd = -1;
 static int lockfd = -1;
+
+static int  dri_cardfd = -1;
+static bool drm_master_found = false, drm_master_set = false;
 
 static int (*orig_ioctl)(int d, int request, void* data);
 static int (*orig_open)(const char *pathname, int flags, mode_t mode);
@@ -121,6 +126,13 @@ int ioctl(int fd, unsigned long int request, ...) {
 
         if ((request == VT_RELDISP && (long)data == 1) ||
             (request == VT_ACTIVATE && (long)data == 0)) {
+            if (drm_master_set) {
+                TRACE("Dropping DRM master: %d\n", dri_cardfd);
+                if (orig_ioctl(dri_cardfd, DRM_IOCTL_DROP_MASTER, NULL) != 0) {
+                    ERROR("Failed to drop DRM master.\n");
+                }
+                drm_master_set = false;
+            }
             if (lockfd != -1) {
                 TRACE("Telling Chromium OS to regain control\n");
                 ret = FREON_DBUS_METHOD_CALL(TakeDisplayOwnership);
@@ -148,6 +160,15 @@ int ioctl(int fd, unsigned long int request, ...) {
             ret = 0;
         } else {
             ret = orig_ioctl(fd, request, data);
+            if (fd == dri_cardfd) {
+                if (request == DRM_IOCTL_SET_MASTER && ret == 0) {
+                    TRACE("ioctl DRM_IOCTL_SET_MASTER %d %lx %p %d\n", fd, request, data, ret);
+                    drm_master_found = drm_master_set = true;
+                } else if (request == DRM_IOCTL_DROP_MASTER) {
+                    TRACE("ioctl DRM_IOCTL_DROP_MASTER %d %lx %p %d\n", fd, request, data, ret);
+                    drm_master_set = false;
+                }
+            }
         }
     }
     va_end(argp);
@@ -165,11 +186,15 @@ static int _open(int (*origfunc)(const char *pathname, int flags, mode_t mode),
         return tty7fd;
     } else {
         const char* event = "/dev/input/event";
+        const char* dri_card = "/dev/dri/card";
         int fd = origfunc(pathname, flags, mode);
         TRACE("%s %s %d\n", origname, pathname, fd);
         if (!strncmp(pathname, event, strlen(event))) {
             TRACE("GRAB\n");
             orig_ioctl(fd, EVIOCGRAB, (void *) 1);
+        } else if (!drm_master_found && !strncmp(pathname, dri_card, strlen(dri_card))) {
+            TRACE("DRI card fd: %d\n", fd);
+            dri_cardfd = fd;
         }
         return fd;
     }
@@ -206,6 +231,13 @@ int close(int fd) {
         tty0fd = -1;
     } else if (fd == tty7fd) {
         tty7fd = -1;
+    } else if (fd == dri_cardfd) {
+        if (drm_master_set) {
+            ERROR("DRI card device closed without dropping DRM master.\n");
+        }
+        TRACE("Reset DRI card fd and DRM master state.\n");
+        drm_master_found = drm_master_set = false;
+        dri_cardfd = -1;
     }
     return orig_close(fd);
 }
