@@ -38,7 +38,7 @@ static int tty7fd = -1;
 static int lockfd = -1;
 
 static int  dri_cardfd = -1;
-static bool drm_master_found = false, drm_master_set = false;
+static bool drm_master_set = false;
 
 static int (*orig_ioctl)(int d, int request, void* data);
 static int (*orig_open)(const char *pathname, int flags, mode_t mode);
@@ -166,7 +166,7 @@ int ioctl(int fd, unsigned long int request, ...) {
                       _IOC_NR(request), data, ret);
                 if (request == DRM_IOCTL_SET_MASTER && ret == 0) {
                     TRACE("ioctl DRM_IOCTL_SET_MASTER %d %lx %p %d\n", fd, request, data, ret);
-                    drm_master_found = drm_master_set = true;
+                    drm_master_set = true;
                 } else if (request == DRM_IOCTL_DROP_MASTER) {
                     TRACE("ioctl DRM_IOCTL_DROP_MASTER %d %lx %p %d\n", fd, request, data, ret);
                     drm_master_set = false;
@@ -195,7 +195,7 @@ static int _open(int (*origfunc)(const char *pathname, int flags, mode_t mode),
         if (!strncmp(pathname, event, strlen(event))) {
             TRACE("GRAB\n");
             orig_ioctl(fd, EVIOCGRAB, (void *) 1);
-        } else if (!drm_master_found && !strncmp(pathname, dri_card, strlen(dri_card))) {
+        } else if (dri_cardfd == -1 && !strncmp(pathname, dri_card, strlen(dri_card))) {
             TRACE("DRI card fd: %d\n", fd);
             dri_cardfd = fd;
         }
@@ -239,7 +239,7 @@ int close(int fd) {
             ERROR("DRI card device closed without dropping DRM master.\n");
         }
         TRACE("Reset DRI card fd and DRM master state.\n");
-        drm_master_found = drm_master_set = false;
+        drm_master_set = false;
         dri_cardfd = -1;
     }
     return orig_close(fd);
