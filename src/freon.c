@@ -39,12 +39,14 @@ static int (*orig_ioctl)(int d, int request, void* data);
 static int (*orig_open)(const char *pathname, int flags, mode_t mode);
 static int (*orig_open64)(const char *pathname, int flags, mode_t mode);
 static int (*orig_close)(int fd);
+static uid_t (*orig_geteuid)(void);
 
 static void preload_init() {
     orig_ioctl = dlsym(RTLD_NEXT, "ioctl");
     orig_open = dlsym(RTLD_NEXT, "open");
     orig_open64 = dlsym(RTLD_NEXT, "open64");
     orig_close = dlsym(RTLD_NEXT, "close");
+    orig_geteuid = dlsym(RTLD_NEXT, "geteuid");
 }
 
 /* Grabs the system-wide lockfile that arbitrates which chroot is using the GPU.
@@ -208,6 +210,14 @@ int close(int fd) {
         tty7fd = -1;
     }
     return orig_close(fd);
+}
+
+uid_t geteuid(void) {
+    if (!orig_geteuid) preload_init();
+
+    uid_t euid = orig_geteuid();
+    TRACE("geteuid %u\n", euid);
+    return euid;
 }
 
 uid_t getuid0(void) {
