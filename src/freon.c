@@ -161,6 +161,9 @@ int ioctl(int fd, unsigned long int request, ...) {
         } else {
             ret = orig_ioctl(fd, request, data);
             if (fd == dri_cardfd) {
+                TRACE("ioctl DRI card %d %lx (%lx:%lx:%lx:%lx) %p %d\n", fd, request,
+                      _IOC_DIR(request), _IOC_SIZE(request), _IOC_TYPE(request),
+                      _IOC_NR(request), data, ret);
                 if (request == DRM_IOCTL_SET_MASTER && ret == 0) {
                     TRACE("ioctl DRM_IOCTL_SET_MASTER %d %lx %p %d\n", fd, request, data, ret);
                     drm_master_found = drm_master_set = true;
