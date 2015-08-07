@@ -38,7 +38,7 @@ static int tty7fd = -1;
 static int lockfd = -1;
 
 static int  dri_cardfd = -1;
-static bool drm_master_set = false;
+static bool drm_master_set = true;
 
 static int (*orig_ioctl)(int d, int request, void* data);
 static int (*orig_open)(const char *pathname, int flags, mode_t mode);
@@ -235,11 +235,8 @@ int close(int fd) {
     } else if (fd == tty7fd) {
         tty7fd = -1;
     } else if (fd == dri_cardfd) {
-        if (drm_master_set) {
-            ERROR("DRI card device closed without dropping DRM master.\n");
-        }
         TRACE("Reset DRI card fd and DRM master state.\n");
-        drm_master_set = false;
+        drm_master_set = true;
         dri_cardfd = -1;
     }
     return orig_close(fd);
