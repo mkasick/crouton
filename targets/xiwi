@@ -52,6 +52,10 @@ wget -O "$DUMMYBUILDTMP/dummy.tar.gz" "$urlbase/xf86-video-dummy-0.3.7.tar.gz"
 install --minimal --asdeps patch gcc libc-dev pkg-config \
     xserver-xorg-dev$ltspackages x11proto-xf86dga-dev
 
+echo "Downgrade xserver-xorg-dev..." 1>&2
+wget -O "$DUMMYBUILDTMP/xserver-xorg-dev.deb" "http://ftp.us.debian.org/debian/pool/main/x/xorg-server/xserver-xorg-dev_1.17.3-2_$ARCH.deb"
+dpkg -i "$DUMMYBUILDTMP/xserver-xorg-dev.deb"
+
 (
     cd "$DUMMYBUILDTMP"
     # -m prevents "time stamp is in the future" spam
