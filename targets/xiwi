@@ -62,6 +62,26 @@ install --minimal --asdeps patch gcc libc-dev pkg-config \
     # -m prevents "time stamp is in the future" spam
     tar --strip-components=1 -xmf dummy.tar.gz
 
+    echo "Patching Xorg dummy driver (fix missing symbol)..." 1>&2
+    patch -p1 <<EOF
+diff --git a/src/dummy_driver.c b/src/dummy_driver.c
+index 470e125..9d4d5bf 100644
+--- a/src/dummy_driver.c
++++ b/src/dummy_driver.c
+@@ -790,8 +790,9 @@ DUMMYCreateWindow(WindowPtr pWin)
+         if (! ValidAtom(VFB_PROP))
+             VFB_PROP = MakeAtom(VFB_PROP_NAME, strlen(VFB_PROP_NAME), 1);
+ 
+-        ret = ChangeWindowProperty(pWinRoot, VFB_PROP, XA_STRING, 
+-		8, PropModeReplace, (int)4, (pointer)"TRUE", FALSE);
++        ret = dixChangeWindowProperty(serverClient, pWinRoot, VFB_PROP,
++                                      XA_STRING, 8, PropModeReplace,
++                                      (int)4, (pointer)"TRUE", FALSE);
+ 	if( ret != Success)
+ 		ErrorF("Could not set VFB root window property");
+         dPtr->prop = TRUE;
+EOF
+
     echo "Patching Xorg dummy driver (xrandr 1.2 support)..." 1>&2
     patch -p1 <<EOF
 diff --git a/src/dummy_driver.c b/src/dummy_driver.c
